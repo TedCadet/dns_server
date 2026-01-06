@@ -1,4 +1,4 @@
-use crate::lib::{byte_buffer::BytePacketBuffer, query_type::QueryType};
+use super::{byte_buffer::BytePacketBuffer, query_type::QueryType};
 use std::{io::Error, net::Ipv4Addr};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -51,5 +51,36 @@ impl DnsRecord {
                 })
             }
         }
+    }
+
+    pub fn write(&self, buffer: &mut BytePacketBuffer) -> Result<usize, &'static str> {
+        let start_pos = buffer.pos();
+
+        match *self {
+            DnsRecord::A {
+                ref domain,
+                ref addr,
+                ttl,
+            } => {
+                buffer.write_qname(domain).unwrap();
+                buffer.write_u16(QueryType::A.to_num()).unwrap();
+                // the class, in practice always set to 1
+                buffer.write_u16(1).unwrap();
+                buffer.write_u32(ttl).unwrap();
+                // Length of the record
+                buffer.write_u16(4).unwrap();
+
+                let addr_octets = addr.octets();
+                buffer.write_u8(addr_octets[0]).unwrap();
+                buffer.write_u8(addr_octets[1]).unwrap();
+                buffer.write_u8(addr_octets[2]).unwrap();
+                buffer.write_u8(addr_octets[3]).unwrap();
+            }
+            DnsRecord::UNKNOWN { .. } => {
+                println!("Skipping record: {:?}", self);
+            }
+        }
+
+        Ok(buffer.pos() - start_pos)
     }
 }

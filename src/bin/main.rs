@@ -1,9 +1,7 @@
-mod lib;
-
 use std::io::Error;
 use std::{fs::File, io::Read};
 
-use crate::lib::{byte_buffer::BytePacketBuffer, dns_packet::DnsPacket};
+use dns_server::dns_handling::{byte_buffer::BytePacketBuffer, dns_packet::DnsPacket};
 
 fn main() -> Result<(), Error> {
     println!("============ Reading packet ==========");

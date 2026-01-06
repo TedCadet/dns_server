@@ -16,7 +16,7 @@ impl BytePacketBuffer {
     }
 
     /// Current position within buffer
-    fn pos(&self) -> usize {
+    pub fn pos(&self) -> usize {
         self.pos
     }
 
@@ -64,7 +64,7 @@ impl BytePacketBuffer {
         Ok(&self.buf[start..start + len as usize])
     }
 
-    /// Read four bytes, stepping four steps forward
+    /// Read two bytes, stepping two steps forward
     pub fn read_u16(&mut self) -> Result<u16, Error> {
         let res = ((self.read().unwrap() as u16) << 8) | (self.read().unwrap() as u16);
 
@@ -79,6 +79,42 @@ impl BytePacketBuffer {
             | ((self.read().unwrap() as u32) << 0);
 
         Ok(res)
+    }
+
+    /// write a byte to the current position of buffer then move the position by one
+    fn write(&mut self, val: u8) -> Result<(), &'static str> {
+        if self.pos >= 512 {
+            return Err("End of buffer");
+        }
+
+        self.buf[self.pos] = val;
+        self.pos += 1;
+        Ok(())
+    }
+
+    /// write a single byte to the buffer
+    pub fn write_u8(&mut self, val: u8) -> Result<(), &'static str> {
+        self.write(val).unwrap();
+
+        Ok(())
+    }
+
+    /// write a two bytes to the buffer
+    pub fn write_u16(&mut self, val: u16) -> Result<(), &'static str> {
+        self.write((val >> 8) as u8).unwrap();
+        self.write((val & 0xFF) as u8).unwrap();
+
+        Ok(())
+    }
+
+    /// write a four bytes to the buffer
+    pub fn write_u32(&mut self, val: u32) -> Result<(), &'static str> {
+        self.write(((val >> 24) & 0xFF) as u8).unwrap();
+        self.write(((val >> 16) & 0xFF) as u8).unwrap();
+        self.write(((val >> 8) & 0xFF) as u8).unwrap();
+        self.write(((val >> 0) & 0xFF) as u8).unwrap();
+
+        Ok(())
     }
 
     /// Read a qname
@@ -167,6 +203,33 @@ impl BytePacketBuffer {
         if !jumped {
             self.seek(pos).unwrap();
         }
+
+        Ok(())
+    }
+
+    /// write the domain name in the buffer
+    pub fn write_qname(&mut self, qname: &str) -> Result<(), &'static str> {
+        // for every label in the domain name, ex: google | com
+        for label in qname.split('.') {
+            // get the length of the label
+            let len = label.len();
+
+            // return an error if le label exceeds the max length
+            if len > 0x3f {
+                return Err("single label exceeds 63 characters of length");
+            }
+
+            // write the length of the label
+            self.write_u8(len as u8).unwrap();
+
+            // write every byte of the label
+            for byte in label.as_bytes() {
+                self.write_u8(*byte).unwrap();
+            }
+        }
+
+        // writing a 0 signifies that it is the end of the label
+        self.write_u8(0).unwrap();
 
         Ok(())
     }

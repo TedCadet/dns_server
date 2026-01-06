@@ -1,6 +1,6 @@
 use std::io::Error;
 
-use crate::lib::{byte_buffer::BytePacketBuffer, result_code::ResultCode};
+use super::{byte_buffer::BytePacketBuffer, result_code::ResultCode};
 
 #[derive(Clone, Debug)]
 pub struct DnsHeader {
@@ -68,6 +68,33 @@ impl DnsHeader {
         self.answers = buffer.read_u16().unwrap();
         self.authoritative_entries = buffer.read_u16().unwrap();
         self.resource_entries = buffer.read_u16().unwrap();
+
+        Ok(())
+    }
+
+    pub fn write(&self, buffer: &mut BytePacketBuffer) -> Result<(), &'static str> {
+        buffer.write_u16(self.id).unwrap();
+
+        let first_group_byte_after_id = (self.recusrion_desired as u8)
+            | ((self.truncated_message as u8) << 1)
+            | ((self.authoritative_answer as u8) << 2)
+            | (self.opcode << 3)
+            | ((self.response as u8) << 7) as u8;
+
+        buffer.write_u8(first_group_byte_after_id).unwrap();
+
+        let second_group_byte_after_id = (self.rescode as u8)
+            | ((self.checking_disabled as u8) << 4)
+            | ((self.authed_data as u8) << 5)
+            | ((self.z as u8) << 6)
+            | ((self.recursion_available as u8) << 7);
+
+        buffer.write_u8(second_group_byte_after_id).unwrap();
+
+        buffer.write_u16(self.questions).unwrap();
+        buffer.write_u16(self.answers).unwrap();
+        buffer.write_u16(self.authoritative_entries).unwrap();
+        buffer.write_u16(self.resource_entries).unwrap();
 
         Ok(())
     }
